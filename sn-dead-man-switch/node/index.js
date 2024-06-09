@@ -1,16 +1,16 @@
-import { SecretNetworkClient, Wallet } from 'secretjs';
-import { readFileSync } from 'fs';
-import { bech32 } from 'bech32';
+import { SecretNetworkClient, Wallet } from "secretjs";
+import { readFileSync } from "fs";
+import { bech32 } from "bech32";
 import dotenv from 'dotenv';
 dotenv.config();
 
-const wallet = new Wallet("crouch cruel frame dizzy actual saddle harvest patch giant enable piece hunt"); 
-const contract_wasm = readFileSync('../contract.wasm');
+const wallet = new Wallet(process.env.MNEMONIC); 
+const contractWasm = readFileSync('../contract.wasm'); // Load WASM file
+//Replace with your actual values 
+let codeId =  8492; // Your contract's code ID here
+let contractCodeHash = "5b7be48ab557e2476f004a20ab31acef6fb93bac0dbafc43f32bf3f692a3cf52";
+let contractAddress = "secret1getmue73adp03szndykhzprr2pjuvqekd3nm09"; // To be filled after instantiation
 
-// Replace with your actual values after deployment
-let codeId = 8490;
-let contractCodeHash = "5e32ad58eaee785d8d28852a57687c1ec3ad042590500be3bb508664c64c9a95";
-let contractAddress = "secret145tyf4t6jaqpjpshsa2glylgm54tvmygldzmj9";
 
 const secretjs = new SecretNetworkClient({
     chainId: "pulsar-3",
@@ -19,12 +19,12 @@ const secretjs = new SecretNetworkClient({
     walletAddress: wallet.address,
   });
 
-  let uploadContract = async () => {
+  let upload_contract = async () => {
     try {
     let tx = await secretjs.tx.compute.storeCode(
       {
         sender: wallet.address,
-        wasm_byte_code: contract_wasm,
+        wasm_byte_code: contractWasm,
         source: "",
         builder: "",
       },
@@ -52,14 +52,15 @@ const secretjs = new SecretNetworkClient({
     
   };
 
-
-  let instantiateContract = async () => {
+async function instantiateContract() {
+  try {
+    const initMsg = { }; 
     let tx = await secretjs.tx.compute.instantiateContract(
       {
         code_id: codeId,
         sender: wallet.address,
         code_hash: contractCodeHash, 
-        init_msg: {},
+        init_msg: initMsg,
         label: "Secret Wallet" + Math.ceil(Math.random() * 10000),
       },
       {
@@ -67,93 +68,84 @@ const secretjs = new SecretNetworkClient({
       }
     );
   
+    // Check if the transaction was successful
+    if (tx.code !== 0) {
+      throw new Error(`Failed to instantiate contract: ${tx.rawLog}`);
+    }
+
     //Find the contract_address in the logs
     const contractAddress = tx.arrayLog.find(
-      (log) => log.type === "message" && log.key === "contract_address"
-    ).value;
-  
-    console.log(contractAddress);
-};
-
-function encodeAddress(address) {
-    const words = bech32.toWords(Buffer.from(address));
-    return bech32.encode('secret', words);
-  }
-
-let initWallet = async (password) => {
-    console.log("Initializing wallet for address:", wallet.address.toString());
-   
-  const tx = await secretjs.tx.compute.executeContract(
-    {
-        sender: wallet.address,
-        contractAddress: contractAddress,
-        msg: { 
-            initWallet: { 
-                address: wallet.address,
-                password: password
-            } 
-        },         
-        code_hash: contractCodeHash,
-    },
-    {
-        gasLimit: 100_000
-    }
-  );
-  if (tx.code !== 0) {
-    console.error("Transaction failed with code:", tx.code);
-    console.log("Raw log:", tx.rawLog); // Log the raw transaction log for more details
-    throw new Error("InitWallet transaction failed");
-  }
-  console.log('Wallet initialized:', tx);
-}
-// Add other functions to interact with your contract
-async function setPassword(oldPassword, newPassword) {
-  try {
-      const tx = await secretjs.tx.compute.executeContract(
-          {
-              sender: wallet.address,
-              contractAddress: contractAddress,
-              codeHash: contractCodeHash,
-              msg: {
-                  set_password: {
-                      current_password: oldPassword ? oldPassword : null,
-                      new_password: newPassword
-                  }
-              }
-          },
-          {
-              gasLimit: 100_000
-          }
-      );
-      console.log('Password updated:', tx);
+        (log) => log.type === "message" && log.key === "contract_address"
+      ).value;
+    
+      console.log(contractAddress);
   } catch (error) {
-      console.error('Failed to update password:', error);
-      throw error; // Rethrow the error to stop execution
+    console.error("Error instantiating contract:", error);
+  }
+}
+
+// Init Wallet Function
+async function initWallet() {
+  try{ 
+    const tx = await secretjs.tx.compute.executeContract(
+      {
+          sender: wallet.address,
+          contract_Address: contractAddress,
+          msg: { 
+              init_wallet: { 
+                  address: wallet.address,
+              } 
+          },      
+          code_hash: contractCodeHash,   
+          sentFunds: []
+      },
+      {
+          gasLimit: 100_000
+      }
+    );
+
+    if (tx.code !== 0) {
+      console.error("Transaction failed with code:", tx.code);
+      console.log("Raw log:", tx.rawLog); // Log the raw transaction log for more details
+      throw new Error("InitWallet transaction failed");
+    }
+  
+    console.log('Wallet initialized:', tx);
+
+  } catch(err){
+    console.error("Error initializing wallet: ", err);
   }
 }
 
 async function getBalance() {
-  const response = await secretjs.query.compute.queryContract({
-    contractAddress: contractAddress,
-    codeHash: contractCodeHash,
-    query: {
-      get_balance: {
-        address: wallet.address
-      }
-    }
-  })
-  console.log("Balance is: ", response.balance);
+  try{
+    const response = await secretjs.query.compute.queryContract({
+        contractAddress: contractAddress,
+        codeHash: contractCodeHash,
+        query: {
+            get_balance: {
+                address: wallet.address
+            }
+        }
+    })
+    console.log("Balance is: ", response.balance);
+  } catch(err){
+    console.error("Error getting the balance: ", err);
+  }
+
 }
+
 async function main() {
-//   await uploadContract();
+//   await upload_contract();
 //   await instantiateContract();
 
-await initWallet("test"); 
+  //Interact with your contract
+  await initWallet(); 
 //   await getBalance();
-//   await setPassword("test", "test2");
-//   await getBalance();
+
 }
 
 main().catch((err) => {
   console.error(err);
 });
+

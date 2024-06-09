@@ -1,186 +1,137 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::msg::{ ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{Account, store_account, load_account, get_balance, validate_password };
+use secret_toolkit::crypto::sha_256;
 
+use cosmwasm_std::StdError;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ContractError {
+    #[error("{0}")]
+    Std(#[from] StdError),
+
+    #[error("Unauthorized")]
+    Unauthorized {},
+
+    #[error("Insufficient funds")]
+    InsufficientFunds {},
+
+    #[error("Account already exists")] 
+    AccountAlreadyExists {},
+}
+
+// 1. instantiate 
 #[entry_point]
 pub fn instantiate(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> StdResult<Response> {
+
+    Ok(Response::default())
+}
+
+// 2. execute
+#[entry_point]
+pub fn execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
-) -> StdResult<Response> {
-    let state = State {
-        count: msg.count,
-        owner: info.sender.clone(),
-    };
-
-    deps.api
-        .debug(format!("Contract was initialized by {}", info.sender).as_str());
-    config(deps.storage).save(&state)?;
-
-    Ok(Response::default())
-}
-
-#[entry_point]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Increment {} => try_increment(deps, env),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::InitWallet { address, password } => {
+            execute_init_wallet(deps, info, address, password)
+        },
+        ExecuteMsg::SetPassword { 
+            current_password, 
+            new_password 
+        } => execute_set_password(deps, info, current_password, new_password),
+       
     }
 }
 
-pub fn try_increment(deps: DepsMut, _env: Env) -> StdResult<Response> {
-    config(deps.storage).update(|mut state| -> Result<_, StdError> {
-        state.count += 1;
-        Ok(state)
-    })?;
+// Execute init wallet
+pub fn execute_init_wallet(
+    deps: DepsMut,
+    info: MessageInfo,
+    address: String,
+    password: Option<String>,
+) -> Result<Response, ContractError> {
+    
+    // Validate the address
+    let validated_address = deps.api.addr_validate(&address)?; 
 
-    deps.api.debug("count incremented successfully");
-    Ok(Response::default())
+    // Ensure that the sender is trying to create their own wallet 
+    if info.sender != validated_address{
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Check if an account with the same address already exists
+    if load_account(deps.storage, &validated_address).is_ok() {
+        return Err(ContractError::AccountAlreadyExists {});
+    }
+
+    // Create a new account with 0 balance
+    let mut account = Account {
+        address: info.sender,
+        balance: 0,
+        password_hash: None,
+    };
+
+    // Optionally set the password hash if provided
+    if let Some(password) = password {
+        let password_hash = sha_256(password.as_bytes());
+        account.password_hash = Some(password_hash.into());
+    }
+
+    // Store the account in state 
+    store_account(deps.storage, &account, &validated_address)?; // <-- Pass validated_address
+
+    Ok(Response::new()
+        .add_attribute("action", "init_wallet")
+        .add_attribute("address", address))
 }
 
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> StdResult<Response> {
-    let sender_address = info.sender.clone();
-    config(deps.storage).update(|mut state| {
-        if sender_address != state.owner {
-            return Err(StdError::generic_err("Only the owner can reset count"));
-        }
-        state.count = count;
-        Ok(state)
-    })?;
+// Set Password Hash
+pub fn execute_set_password(
+    deps: DepsMut,
+    info: MessageInfo,
+    current_password: Option<String>,
+    new_password: String,
+) -> Result<Response, ContractError> {
+    let validated_address = deps.api.addr_validate(&info.sender.clone().into_string())?;
 
-    deps.api.debug("count reset successfully");
-    Ok(Response::default())
+    let mut account = load_account(deps.storage, &info.sender)?;
+
+    // if the user is trying to set up their password for the first time
+    if current_password.is_none() {
+        account.password_hash = Some(sha_256(new_password.as_bytes()).into());
+    // if the user is trying to update their password
+    } else if let Some(current_password) = current_password {
+        // Hash the passwords
+        let current_password_hash = sha_256(current_password.as_bytes());
+        let new_password_hash = sha_256(new_password.as_bytes());
+
+        if !validate_password(deps.storage, &account.address, &current_password_hash)? {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        account.password_hash = Some(new_password_hash.into());
+    }
+
+    store_account(deps.storage, &account, &info.sender)?; // Pass in &info.sender
+    Ok(Response::new())
 }
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
-    }
-}
-
-fn query_count(deps: Deps) -> StdResult<CountResponse> {
-    let state = config_read(deps.storage).load()?;
-    Ok(CountResponse { count: state.count })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{from_binary, Coin, StdError, Uint128};
-
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies();
-        let info = mock_info(
-            "creator",
-            &[Coin {
-                denom: "earth".to_string(),
-                amount: Uint128::new(1000),
-            }],
-        );
-        let init_msg = InstantiateMsg { count: 17 };
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies_with_balance(&[Coin {
-            denom: "token".to_string(),
-            amount: Uint128::new(2),
-        }]);
-        let info = mock_info(
-            "creator",
-            &[Coin {
-                denom: "token".to_string(),
-                amount: Uint128::new(2),
-            }],
-        );
-        let init_msg = InstantiateMsg { count: 17 };
-
-        let _res = instantiate(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-
-        // anyone can increment
-        let info = mock_info(
-            "anyone",
-            &[Coin {
-                denom: "token".to_string(),
-                amount: Uint128::new(2),
-            }],
-        );
-
-        let exec_msg = ExecuteMsg::Increment {};
-        let _res = execute(deps.as_mut(), mock_env(), info, exec_msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies_with_balance(&[Coin {
-            denom: "token".to_string(),
-            amount: Uint128::new(2),
-        }]);
-        let info = mock_info(
-            "creator",
-            &[Coin {
-                denom: "token".to_string(),
-                amount: Uint128::new(2),
-            }],
-        );
-        let init_msg = InstantiateMsg { count: 17 };
-
-        let _res = instantiate(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-
-        // not anyone can reset
-        let info = mock_info(
-            "anyone",
-            &[Coin {
-                denom: "token".to_string(),
-                amount: Uint128::new(2),
-            }],
-        );
-        let exec_msg = ExecuteMsg::Reset { count: 5 };
-
-        let res = execute(deps.as_mut(), mock_env(), info, exec_msg);
-
-        match res {
-            Err(StdError::GenericErr { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let info = mock_info(
-            "creator",
-            &[Coin {
-                denom: "token".to_string(),
-                amount: Uint128::new(2),
-            }],
-        );
-        let exec_msg = ExecuteMsg::Reset { count: 5 };
-
-        let _res = execute(deps.as_mut(), mock_env(), info, exec_msg).unwrap();
-
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
+        QueryMsg::GetBalance { address } => to_binary(&get_balance(deps.storage, &deps.api.addr_validate(&address)?)?), 
     }
 }

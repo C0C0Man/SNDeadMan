@@ -1,5 +1,5 @@
 [package]
-name = "secret_contract_example"
+name = "sn_deadman_switch"
 version = "0.1.0"
 authors = ["SecretTemplateExample"]
 edition = "2021"
@@ -23,6 +23,7 @@ default = []
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
+schema = []
 
 [dependencies]
 cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", tag = "v1.1.9-secret" }
@@ -32,8 +33,16 @@ serde = { version = "1.0" }
 thiserror = { version = "1.0" }
 cosmwasm-schema = "1.0.0"
 
+
 # Uncomment these for some common extra tools
-# secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", tag = "v0.8.0" }
+secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", tag = "v0.8.0", default-features = false, features = [
+   "utils",
+   "storage",
+   "serialization",
+   "viewing-key",
+   "crypto",
+   "permit", 
+] }
 # cw-storage-plus = { version = "1.0.1", default-features = false }
 
 # [patch.crates-io]

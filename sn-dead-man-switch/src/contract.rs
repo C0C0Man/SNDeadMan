@@ -44,8 +44,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::InitWallet { address, .. } => {
-            execute_init_wallet(deps, info, address)
+        ExecuteMsg::InitWallet {  } => {
+            execute_init_wallet(deps, info)
         },
     }
 }
@@ -55,24 +55,13 @@ pub fn execute(
 pub fn execute_init_wallet(
     deps: DepsMut,
     info: MessageInfo,
-    address: String, 
 ) -> Result<Response, ContractError> {
 
-    let account_address = deps.api.addr_validate(&address)?; 
-
-    // Ensure that the sender is trying to create their own wallet 
-    if info.sender != account_address{
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // Check if an account with the same address already exists
-    if load_account(deps.storage, &account_address).is_ok() {
-        return Err(ContractError::AccountAlreadyExists {});
-    }
+let address = Addr::unchecked(info.sender.to_string());
 
     // Create a new account with 0 balance
     let account = Account {
-        address: account_address.clone(),
+        address: address.clone(),
         balance: 0,
     };
 

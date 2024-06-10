@@ -10,9 +10,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     // Connecting wallet to smart contract
-    InitWallet {
-        address: String,
-    },
+    InitWallet { },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]

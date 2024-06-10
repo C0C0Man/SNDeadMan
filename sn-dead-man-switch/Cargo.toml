@@ -26,29 +26,13 @@ backtraces = ["cosmwasm-std/backtraces"]
 schema = []
 
 [dependencies]
-cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", tag = "v1.1.9-secret" }
-cosmwasm-storage = { git = "https://github.com/scrtlabs/cosmwasm", tag = "v1.1.9-secret" }
+cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.0.0" }
+cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.0.0" }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0" }
 thiserror = { version = "1.0" }
 cosmwasm-schema = "1.0.0"
-
-
-# Uncomment these for some common extra tools
-secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", tag = "v0.8.0", default-features = false, features = [
-   "utils",
-   "storage",
-   "serialization",
-   "viewing-key",
-   "crypto",
-   "permit", 
-   "snip20",
-] }
-# cw-storage-plus = { version = "1.0.1", default-features = false }
-
-# [patch.crates-io]
-# uncomment this if you use cw-storage-plus
-# cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", tag = "v1.1.9-secret" }
+secret-toolkit = { version = "0.10.0", default-features = false, features = ["utils", "storage", "serialization", "viewing-key", "permit"] }
 
 [[bin]]
 name = "schema"

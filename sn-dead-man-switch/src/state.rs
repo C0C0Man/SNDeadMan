@@ -53,7 +53,6 @@ pub fn load_account(storage: &dyn Storage, address: &Addr) -> StdResult<Account>
 }
 
 
-
 pub fn get_balance(deps: Deps, address: &Addr, denom: String) -> StdResult<AccountResponse> {
 
     // Query the blockchain for the account balance

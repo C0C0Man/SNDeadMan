@@ -1,6 +1,6 @@
 use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use cosmwasm_std::{Addr, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, StdError, StdResult, Storage, Deps};
 use secret_toolkit::serialization::Bincode2;
 use secret_toolkit::serialization::Serde;
 use secret_toolkit::storage::Keymap;
@@ -54,12 +54,13 @@ pub fn load_account(storage: &dyn Storage, address: &Addr) -> StdResult<Account>
 
 
 
-// Get Balance
-pub fn get_balance(storage: &dyn Storage, address: &Addr) -> StdResult<AccountResponse> {
-    let account = load_account(storage, address)?;
+pub fn get_balance(deps: Deps, address: &Addr, denom: String) -> StdResult<AccountResponse> {
+
+    // Query the blockchain for the account balance
+    let balance = deps.querier.query_balance(address, denom)?;
+
     Ok(AccountResponse {
-        address: account.address,
-        balance: account.balance,
+        address: address.clone(),
+        balance: balance.amount.u128(), 
     })
 }
-

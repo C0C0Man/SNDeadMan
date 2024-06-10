@@ -5,11 +5,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const wallet = new Wallet(process.env.MNEMONIC); 
-const contractWasm = readFileSync('../contract.wasm'); // Load WASM file
+const contractWasm = readFileSync('../contract.wasm');
 //Replace with your actual values 
-let codeId =  8492; // Your contract's code ID here
+let codeId =  8492; 
 let contractCodeHash = "5b7be48ab557e2476f004a20ab31acef6fb93bac0dbafc43f32bf3f692a3cf52";
-let contractAddress = "secret1getmue73adp03szndykhzprr2pjuvqekd3nm09"; // To be filled after instantiation
+let contractAddress = "secret1getmue73adp03szndykhzprr2pjuvqekd3nm09"; 
 
 
 const secretjs = new SecretNetworkClient({
@@ -91,12 +91,12 @@ async function initWallet() {
       {
           sender: wallet.address,
           contract_Address: contractAddress,
+          code_hash: contractCodeHash, 
           msg: { 
               init_wallet: { 
                   address: wallet.address,
               } 
           },      
-          code_hash: contractCodeHash,   
           sentFunds: []
       },
       {

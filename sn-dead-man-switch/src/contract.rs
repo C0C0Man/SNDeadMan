@@ -88,7 +88,10 @@ pub fn execute_init_wallet(
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetBalance { address } => to_binary(&get_balance(deps.storage, &deps.api.addr_validate(&address)?)?), 
+        QueryMsg::GetBalance { address } => {
+            let validated_address = deps.api.addr_validate(&address)?; // Validate address
+            to_binary(&get_balance(deps, &validated_address, "uscrt".to_string())?) 
+        }
     }
 }
 

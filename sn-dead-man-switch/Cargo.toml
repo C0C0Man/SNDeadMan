@@ -42,6 +42,7 @@ secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", tag = "v0
    "viewing-key",
    "crypto",
    "permit", 
+   "snip20",
 ] }
 # cw-storage-plus = { version = "1.0.1", default-features = false }
 

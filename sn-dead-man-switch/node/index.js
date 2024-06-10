@@ -5,11 +5,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const wallet = new Wallet(process.env.MNEMONIC); 
-const contractWasm = readFileSync('../contract.wasm');
+const contractWasm = readFileSync('../contract.wasm.gz');
 //Replace with your actual values 
-let codeId =  8492; 
-let contractCodeHash = "5b7be48ab557e2476f004a20ab31acef6fb93bac0dbafc43f32bf3f692a3cf52";
-let contractAddress = "secret1getmue73adp03szndykhzprr2pjuvqekd3nm09"; 
+// let codeId =  8492; 
+// let contractCodeHash = "5b7be48ab557e2476f004a20ab31acef6fb93bac0dbafc43f32bf3f692a3cf52";
+// let contractAddress = "secret1getmue73adp03szndykhzprr2pjuvqekd3nm09"; 
 
 
 const secretjs = new SecretNetworkClient({
@@ -52,14 +52,16 @@ const secretjs = new SecretNetworkClient({
     
   };
 
+  // upload_contract(); 
+
 async function instantiateContract() {
   try {
     const initMsg = { }; 
     let tx = await secretjs.tx.compute.instantiateContract(
       {
-        code_id: codeId,
+        code_id: 8529,
         sender: wallet.address,
-        code_hash: contractCodeHash, 
+        code_hash: "a1be0b220684ffe3809d8c6e81ab9e3fa70b807893cdbf92abd4b1504af0b999", 
         init_msg: initMsg,
         label: "Secret Wallet" + Math.ceil(Math.random() * 10000),
       },
@@ -84,38 +86,26 @@ async function instantiateContract() {
   }
 }
 
+// instantiateContract()
+
 // Init Wallet Function
-async function initWallet() {
-  try{ 
-    const tx = await secretjs.tx.compute.executeContract(
-      {
-          sender: wallet.address,
-          contract_Address: contractAddress,
-          code_hash: contractCodeHash, 
-          msg: { 
-              init_wallet: { 
-                  address: wallet.address,
-              } 
-          },      
-          sentFunds: []
+let init_wallet = async () => {
+  const tx = await secretjs.tx.compute.executeContract(
+    {
+      sender: wallet.address,
+      contract_address: "secret1wh4le3m7lks9pqyyrxgv4490pdc6uzj78rsv6g",
+      msg: {
+        init_wallet: {},
       },
-      {
-          gasLimit: 100_000
-      }
-    );
+      code_hash: "a1be0b220684ffe3809d8c6e81ab9e3fa70b807893cdbf92abd4b1504af0b999",
+    },
+    { gasLimit: 2_000_000 }
+  );
 
-    if (tx.code !== 0) {
-      console.error("Transaction failed with code:", tx.code);
-      console.log("Raw log:", tx.rawLog); // Log the raw transaction log for more details
-      throw new Error("InitWallet transaction failed");
-    }
-  
-    console.log('Wallet initialized:', tx);
+  console.log(tx);
+};
 
-  } catch(err){
-    console.error("Error initializing wallet: ", err);
-  }
-}
+init_wallet();
 
 async function getBalance() {
   try{
@@ -135,17 +125,17 @@ async function getBalance() {
 
 }
 
-async function main() {
-//   await upload_contract();
-//   await instantiateContract();
+// async function main() {
+// //   await upload_contract();
+// //   await instantiateContract();
 
-  //Interact with your contract
-  await initWallet(); 
-//   await getBalance();
+//   //Interact with your contract
+//   await initWallet(); 
+// //   await getBalance();
 
-}
+// }
 
-main().catch((err) => {
-  console.error(err);
-});
+// main().catch((err) => {
+//   console.error(err);
+// });
 
